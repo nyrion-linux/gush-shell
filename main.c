@@ -6,8 +6,29 @@
 #include <limits.h>
 #include <sys/wait.h>
 #include <string.h>
+#include "historic.h"
+#include <curses.h>
+#include <linux/limits.h>
+#include <sys/types.h>
+
+// Colors yay yay yay yay yay yay
+
+#define GRAY    "\x1b[38m"
+#define RED     "\x1b[31m"
+#define GREEN   "\x1b[32m"
+#define YELLOW  "\x1b[33m"
+#define BLUE    "\x1b[34m"
+#define MAGENTA "\x1b[35m"
+#define CYAN    "\x1b[36m"
+#define RESET   "\x1b[0m"
+#define BLACK   "\x1b[30m"
+#define WHITE   "\x1b[37m"
+
+// RIP colors now spaghetti code no no no no no
 
 int main() {
+    // Initialize the historic file path
+
     char userHostname[100 + 256];
     char currentDir[1024];
 
@@ -23,69 +44,36 @@ int main() {
     } else {
         perror("getcwd() error");
     }
+    historic_check(KEY_UP, KEY_DOWN, userHostname, currentDir);
 
-    printf("Welcome to the shell gush!\n");
     while (1) {
-        printf("%s:%s$ ", userHostname, currentDir);
+        printf(GREEN "%s: " RESET, userHostname);
+        printf(YELLOW "%s$ " RESET, currentDir);
 
+        // Read user input
         char *userCommand = readline(NULL);
 
-        if (userCommand) {
-            // Inline code for parseCmds and arrayParsedCommand
-            char *parsedCommand = strtok(userCommand, " ");
-            char *commandArguments[20];
-            int i = 0;
-            int HasPipe = 0;
-            int HasAppendTo = 0;
-            int HasWriteTo = 0;
-            while (parsedCommand != NULL) {
-                commandArguments[i] = parsedCommand;
-                parsedCommand = strtok(NULL, " ");
-                if (parsedCommand == "|") {
-                    HasPipe++;
-                }
-                if (HasPipe > 5) {
-                    printf("\tToo many pipes!\n");
-                    break;
-                }
-                if (parsedCommand == ">>") {
-                    HasAppendTo++;
-                }
-                if (HasAppendTo > 2) {
-                    printf("\tToo many Appends!\n");
-                    break;
-                }
-                if (parsedCommand == ">") {
-                    HasWriteTo++;
-                }
-                if (HasWriteTo > 2) {
-                    printf("\tToo many Writes!\n");
-                    break;
-                }
-                i++;
-            
-            }
-            commandArguments[i] = NULL; // Finalize the array with NULL
+        if (userCommand && *userCommand) {
+            // Add the command to history
+            add_history(userCommand);
 
-            // Inline code for exitCheck
-            if (strcmp(commandArguments[0], "exit") == 0) {
-                printf("Exiting shell\n");
-                exit(0);
+            // Save the command to the historic file
+            add_to_historic(userCommand);
+
+            // Check for the "exit" command
+            if (strcmp(userCommand, "exit") == 0) {
+                free(userCommand);
+                printf("Exiting...\n");
+                break; // Exit the loop
             }
 
-            // Inline code for execWithChild
-            pid_t pid = fork();
-            if (pid == 0) {
-                // Child process
-                execvp(commandArguments[0], commandArguments);
-                exit(1);
-            } else if (pid > 0) {
-                // Parent process
-                waitpid(pid, NULL, 0);
-            } else {
-                perror("fork failed");
-            }
+            // Call historic_check to handle arrow keys
+            historic_check(KEY_UP, KEY_DOWN, userHostname, currentDir);
+
+            // Rest of your code...
         }
+
+        free(userCommand);
     }
 
     return 0;
